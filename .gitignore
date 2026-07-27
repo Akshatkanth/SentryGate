@@ -12,3 +12,4 @@ venv/
 env/
 .env/
 
+__pycache__/tutorial_app.cpython-314.pyc

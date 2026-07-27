@@ -1,10 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from pydantic import BaseModel
-from fastapi import Depends
-from fastapi import HTTPException
-
-import time
-from fastapi import Request
+from typing import Optional
+import sqlite3
 
 app = FastAPI()
 
@@ -12,10 +9,15 @@ class ChatRequest(BaseModel):
     user_id: str
     message: str
 
+class GuardrailResult(BaseModel):
+    blocked: bool
+    reason: Optional[str] = None
+    category: Optional[str] = None
+
 class ChatResponse(BaseModel):
     reply: str
-    blocked: bool
-
+    input_guardrail: GuardrailResult
+    output_guardrail: GuardrailResult
 
 def get_db():
     conn = sqlite3.connect("sentrygate.db")
@@ -25,30 +27,35 @@ def get_db():
     finally:
         conn.close()
 
+def check_input(message: str) -> GuardrailResult:
+    # placeholder — real regex/keyword logic comes in Phase 2
+    if "ignore previous instructions" in message.lower():
+        return GuardrailResult(blocked=True, reason="prompt injection phrase", category="injection")
+    return GuardrailResult(blocked=False)
+
+def check_output(reply: str) -> GuardrailResult:
+    # placeholder — real logic comes in Phase 5
+    return GuardrailResult(blocked=False)
+
 @app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest, db: sqlite3.Connection = Depends(get_db)):
+    input_result = check_input(request.message)
 
-@app.middleware("http")
-async def log_timing(request: Request, call_next):
-    start = time.time()
-    response = await call_next(request)
-    duration_ms = (time.time() - start) * 1000
-    print(f"{request.method} {request.url.path} took {duration_ms:.1f}ms")
-    return response
+    if input_result.blocked:
+        reply = "I can't help with that request."
+    else:
+        reply = f"Simulated bot reply to: {request.message}"  # Groq call goes here later
 
-def chat(request: ChatRequest, db: sqlite3.Connection = Depends(get_db)):
+    output_result = check_output(reply)
+
     db.execute(
-        "INSERT INTO requests (user_input) VALUES (?)",
-        (request.message,)
+        "INSERT INTO requests (user_input, input_blocked, input_block_reason) VALUES (?, ?, ?)",
+        (request.message, input_result.blocked, input_result.reason),
     )
     db.commit()
-    ...
 
-    
-@app.get("/requests/{request_id}")
-def get_request(request_id: int, db: sqlite3.Connection = Depends(get_db)):
-    row = db.execute(
-        "SELECT * FROM requests WHERE id = ?", (request_id,)
-    ).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Request not found")
-    return dict(row)
+    return ChatResponse(
+        reply=reply,
+        input_guardrail=input_result,
+        output_guardrail=output_result,
+    )
