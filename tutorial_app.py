@@ -42,6 +42,8 @@ def chat(request: ChatRequest, db: sqlite3.Connection = Depends(get_db)):
     )
     db.commit()
     ...
+
+    
 @app.get("/requests/{request_id}")
 def get_request(request_id: int, db: sqlite3.Connection = Depends(get_db)):
     row = db.execute(
