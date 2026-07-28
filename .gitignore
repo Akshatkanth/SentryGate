@@ -12,4 +12,7 @@ venv/
 env/
 .env/
 
-
+# Databases
+*.db
+*.sqlite
+*.sqlite3
