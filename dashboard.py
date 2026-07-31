@@ -69,7 +69,7 @@ if not requests_df.empty:
     st.subheader("Requests per Day")
     if 'timestamp' in requests_df.columns:
         # Convert to datetime and extract date
-        requests_df['date'] = pd.to_datetime(requests_df['timestamp']).dt.date
+        requests_df['date'] = pd.to_datetime(requests_df['timestamp'], format='mixed', utc=True).dt.date
         date_counts = requests_df.groupby('date').size()
         
         if len(date_counts) < 2:
